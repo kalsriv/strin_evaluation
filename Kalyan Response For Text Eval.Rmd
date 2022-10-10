@@ -1,0 +1,165 @@
+---
+title: "Kalyan Response"
+author: "Kalyan Srivastava"
+date: '2022-10-09'
+output: html_document
+---
+Calling the libraries to be used in the script
+
+```{r}
+library(stringr)
+library(pryr)
+library(dplyr)
+library(readr)
+library(readtext)
+library(testthat)
+
+```
+The script below would generate the word and its frequency. The details of the codes are written in the comment.
+
+```{r Question 1 word count}
+rm(list=ls())
+my_data <- read_file("sample.txt") # Read the file using is thge part of readr library
+my_data <- gsub("[\r\n\\]","", my_data) #Using gsub to remove next line and returns. gsub is a base r function that has proven speed and ease of use. Eventually gsub can be used for removing any unwanted word e.g. the and a, if required.
+my_data <- gsub("[!|'|.|,|;|-|?|/]","", my_data) #Using gsub to remove exclamation mark commas and fullstops etc.
+my_data <- gsub("[\"]","", my_data) #Using gsub to remove slashes
+my_data <- str_split(my_data, " ") #str_split is stringr function to split each word in our list
+unique_data <- unique(unlist(my_data, use.names = FALSE)) #Creating a unique list to avoid duplication. This would help later in iteration by unique search word.
+x <- length(unique_data) #Finding the length of this unique list
+
+string_eval <- function() { #Creating function to count occurence by each search word 
+
+  
+    for (i in 1:x){
+                    
+                   x <- lengths(gregexpr(unique_data[i], my_data, ignore.case = TRUE)) #Using regex for checking and counting
+                   print(paste0(unique_data[i], " occurs ", x, " times ")) #Preparing the outcome
+                  }
+  
+}
+
+timex <- system.time(string_eval()) #Running the function and checking the time
+print(timex)
+print(paste0("Total memory used is ", mem_used()))
+rm(my_data) #Removing the interim objects
+
+```
+One way to improve the speed and legibility of the code is to implement the dplyr library of R. This provides multiple sql like functionality, piping of code and eventually the speed over the base R codes, In the following improvement I have applied dplyr wherever possible. Another approach is sparklyr library, which out of scope of this response. 
+
+```{r Question 2  improvements}
+rm(list=ls())
+
+my_data <- read_file("sample.txt")
+
+my_data <- gsub("[\r\n\\]","", my_data)
+my_data <- gsub("[!|'|.|,|;|-|?|/]","", my_data)
+my_data <- gsub("[\"]","", my_data)
+
+my_data <- str_split(my_data, " ")
+unique_data <- unlist(my_data, use.names = FALSE) %>% unique()
+x <- unique_data %>% length
+
+string_eval <- function() {
+
+  
+    for (i in 1:x){
+                    
+                   x <- gregexpr(unique_data[i], my_data, ignore.case = TRUE) %>% lengths()
+                   paste0(unique_data[i], " occurs ", x, " times ") %>% print()
+                  }
+  
+}
+timex <- string_eval() %>% system.time()
+timex %>% print()
+rm(my_data)
+
+```
+
+The script below would identify the word that has highest occurrence and number of time it occurs. This has been achieved by creating an interim dataframe new_df, which could later be used for evaluating the maximum value using dplyr library. The new_df originally had a blanks retained, this was nevertheless removed by filter function from dplyr.  
+
+```{r Question 3 highest count}
+my_data <- read_file("sample.txt")
+my_data <- gsub("[\r\n\\]"," ", my_data)
+my_data <- gsub("[!|'|.|,|;|-|?|/]"," ", my_data)
+my_data <- gsub("[\"]"," ", my_data)
+my_data <- str_split(my_data, " ")
+unique_data <- unique(unlist(my_data, use.names = FALSE))
+x <- unique_data %>% length
+
+string_eval <- function() {
+    
+    df <- data.frame()
+    for (i in 1:x){
+                    
+                   x <- lengths(gregexpr(unique_data[i], my_data, ignore.case = TRUE))
+                   df_ <- data.frame(unique_data[i], x)
+                   df <- rbind(df, df_)
+                   
+                  }
+                  return(df)
+    
+                          }
+
+df_new <- string_eval()
+
+df_new <- df_new %>% 
+  rename(
+    A = unique_data.i.,
+    B = x
+    )
+df_new <- df_new %>% filter(A != "" & A != " ")
+result_df <- df_new[which.max(df_new$B),]
+print(paste0("The word ", "'", result_df$A, "'", " occurs ", result_df$B, " times."))
+
+```
+Below I have used the  expect_equal() function from testthat library of R for unit test. The function max_eval has been generated to evaluate the maximum value just like question 3. The expected value is 258. This would generate Test passed. Replacing 259 or some other value, this would generate an error. 
+
+```{r Question 4 unit tests}
+
+rm(list=ls())
+my_data <- read_file("sample.txt") # Read the file using is thge part of readr library
+my_data <- gsub("[\r\n\\]","", my_data) #Using gsub to remove next line and returns. gsub is a base r function that has proven speed and ease of use. Eventually gsub can be used for removing any unwanted word e.g. the and a, if required.
+my_data <- gsub("[!|'|.|,|;|-|?|/]","", my_data) #Using gsub to remove excalamtion mark commas and fullstops etc.
+my_data <- gsub("[\"]","", my_data) #Using gsub to remove slashes
+my_data <- str_split(my_data, " ") #str_split is stringr function to split each word in our list
+unique_data <- unique(unlist(my_data, use.names = FALSE)) #Creating a unique list to avoid duplication. This would help later in iteration by unique search word.
+x <- length(unique_data) #Finding the length of this unique list
+
+string_eval <- function() {
+    
+    df <- data.frame()
+    for (i in 1:x){
+                    
+                   x <- lengths(gregexpr(unique_data[i], my_data, ignore.case = TRUE))
+                   df_ <- data.frame(unique_data[i], x)
+                   df <- rbind(df, df_)
+                   
+                  }
+                  return(df)
+    
+}
+
+max_eval <- function() 
+      {df_new <- string_eval()
+      
+      df_new <- df_new %>% 
+        rename(
+          A = unique_data.i.,
+          B = x
+          )
+      df_new <- df_new %>% filter(A != "" & A != " ")
+      result_df <- df_new[which.max(df_new$B),]
+       return(result_df$B)
+      }
+
+#string_eval()
+context("strin evaluations")
+
+test_that("running produce the number of times the result occurs", {
+  expect_equal(max_eval(), 258)
+
+}
+)
+
+```
+
